@@ -37,7 +37,8 @@
 
   <p id="liveShade">Shade: ---</p>
   <div id="confidenceFill">ΔE00: ---</div>
-
+<p id="licenseStatus" style="color: red;">🔒 License not active</p>
+<p id="trialCountdown">Trial time left: 15:00</p>
 
 
   <br />
@@ -45,9 +46,19 @@
   <button id="saveRegion">Save Region</button>
   <button id="saveMerge">Save Merged</button>
 <button id="shareBtn">Share via WhatsApp</button>
+<button id="payBtn">Unlock Full Access</button>
+<p id="licenseStatus" style="color: red;">🔒 License not active</p>
+
+
+
 
 
  <script>
+window.addEventListener("load", () => {
+  startTrialIfNeeded();
+  checkLicense();
+});
+
  if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js');
@@ -77,6 +88,17 @@ const webShades = {
   "C4":[147.8,154.4,107.8],"D2":[184.5,191.4,180.5],"D3":[179.8,183.7,163.7],
   "D4":[175.5,180.0,144.7]
 };
+
+setInterval(() => {
+  const start = parseInt(localStorage.getItem(trialStartKey));
+  const now = Date.now();
+  const remaining = Math.max(0, TRIAL_DURATION_MS - (now - start));
+  const minutes = Math.floor(remaining / 60000);
+  const seconds = Math.floor((remaining % 60000) / 1000);
+  document.getElementById("trialCountdown").textContent =
+    `Trial time left: ${minutes}:${seconds.toString().padStart(2, "0")}`;
+}, 1000);
+
 
 function getAverageRGB(data) {
   const sum = [0, 0, 0];
@@ -142,6 +164,84 @@ function saveJSONFile(filename) {
   link.download = filename;
   link.click();
 }
+
+async function initiatePayment() {
+  const deviceId = getDeviceId();
+  const orderId = `shade_${Date.now()}`;
+  const amount = 499; // ₹499 or your chosen price
+
+  const response = await fetch("https://your-backend.com/initiate-payment", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId, amount, deviceId })
+  });
+
+  const data = await response.json();
+  if (data.paymentUrl) {
+    window.open(data.paymentUrl, "_blank");
+  } else {
+    alert("Payment initiation failed. Please try again.");
+  }
+}
+
+
+document.getElementById("payBtn").onclick = initiatePayment;
+const TRIAL_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const trialStartKey = "shade_trial_start";
+
+function startTrialIfNeeded() {
+  if (!localStorage.getItem(trialStartKey)) {
+    localStorage.setItem(trialStartKey, Date.now().toString());
+  }
+}
+function getDeviceId() {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  ctx.textBaseline = "top";
+  ctx.font = "14px Arial";
+  ctx.fillText("shade-detection", 2, 2);
+  return canvas.toDataURL();
+}
+function activateLicense() {
+  const deviceId = getDeviceId();
+  localStorage.setItem("shade_license", "active");
+  localStorage.setItem("shade_device_id", deviceId);
+  localStorage.removeItem("shade_trial_start");
+}
+function isDeviceValid() {
+  const storedId = localStorage.getItem("shade_device_id");
+  return storedId === getDeviceId();
+}
+
+
+function isTrialActive() {
+  const start = parseInt(localStorage.getItem(trialStartKey));
+  const now = Date.now();
+  return now - start < TRIAL_DURATION_MS;
+}
+
+function checkLicense() {
+  const license = localStorage.getItem("shade_license") === "active" && isDeviceValid();
+
+  const trial = isTrialActive();
+  const allowed = license || trial;
+
+  const statusEl = document.getElementById("licenseStatus");
+  if (license) {
+    statusEl.textContent = "✅ License active";
+    statusEl.style.color = "green";
+  } else if (trial) {
+    statusEl.textContent = "🧪 Trial active";
+    statusEl.style.color = "orange";
+  } else {
+    statusEl.textContent = "🔒 Trial expired. Please unlock full access.";
+    statusEl.style.color = "red";
+  }
+
+  return allowed;
+}
+
+
 
 document.getElementById("saveSingle").onclick = () => {
   const name = document.getElementById("patientNameInput").value.trim();
@@ -219,22 +319,29 @@ navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } }).then
   video.srcObject = stream;
   video.addEventListener("loadeddata", () => {
     function drawLoop() {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  if (!checkLicense()) {
+    shadeLive.textContent = "🔒 Trial expired";
+    confidenceFill.textContent = "ΔE00: --";
+    confidenceFill.style.backgroundColor = "gray";
+    return; // Stop rendering
+  }
 
-      const r = 80;
-      const roiX = canvas.width / 2;
-      const roiY = canvas.height / 2;
-      const data = ctx.getImageData(roiX - r, roiY - r, r * 2, r * 2).data;
-      const avg = getAverageRGB(data);
-      const [shade, delta] = findClosestShade(avg);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const r = 80;
+  const roiX = canvas.width / 2;
+  const roiY = canvas.height / 2;
+  const data = ctx.getImageData(roiX - r, roiY - r, r * 2, r * 2).data;
+  const avg = getAverageRGB(data);
+  const [shade, delta] = findClosestShade(avg);
 
-      shadeLive.textContent = `Detected Shade: ${shade}`;
-      confidenceFill.textContent = `ΔE00: ${delta.toFixed(2)}`;
-      confidenceFill.style.backgroundColor = delta < 3 ? "green" : delta < 6 ? "orange" : "red";
-      confidenceFill.style.width = Math.min(100, 100 - delta * 5) + "%";
+  shadeLive.textContent = `Detected Shade: ${shade}`;
+  confidenceFill.textContent = `ΔE00: ${delta.toFixed(2)}`;
+  confidenceFill.style.backgroundColor = delta < 3 ? "green" : delta < 6 ? "orange" : "red";
+  confidenceFill.style.width = Math.min(100, 100 - delta * 5) + "%";
 
-      requestAnimationFrame(drawLoop);
-    }
+  requestAnimationFrame(drawLoop);
+}
+
 
     drawLoop(); // Start live shade monitoring
   
