@@ -1,7 +1,15 @@
 // File: /api/initiate-payment.js
 
 export default async function handler(req, res) {
-res.setHeader("Access-Control-Allow-Origin", "https://digital-shade-guide-git-main-tirumalarajajees-projects.vercel.app/"); // or your domain
+const allowedOrigins = [
+    "https://digital-shade-guide.vercel.app",
+    "https://digital-shade-guide-git-main-tirumalarajajees-projects.vercel.app"
+  ];
+
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
 res.setHeader("Access-Control-Allow-Methods", "POST");
 res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
