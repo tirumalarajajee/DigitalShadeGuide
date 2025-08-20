@@ -197,14 +197,17 @@ async function initiatePayment() {
       body: JSON.stringify({ orderId, amount, deviceId })
     });
 
+    console.log("Response status:", response.status);
+
     const data = await response.json();
+
     if (data.paymentUrl) {
       window.open(data.paymentUrl, "_blank");
     } else {
       alert("⚠️ Payment initiation failed. Please try again.");
     }
   } catch (err) {
-    console.error("Payment error:", err);
+    console.error("Payment error:", err.message || err);
     alert("🚫 Unable to connect to payment server.");
   }
 }
