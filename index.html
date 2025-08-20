@@ -99,6 +99,17 @@ setInterval(() => {
     `Trial time left: ${minutes}:${seconds.toString().padStart(2, "0")}`;
 }, 1000);
 
+ window.addEventListener("DOMContentLoaded", () => {
+    const token = localStorage.getItem("licenseToken");
+    const deviceId = getDeviceId(); // your fingerprinting logic
+
+    if (validateLicenseToken(token, deviceId)) {
+      enableShadeDetection(); // unlock premium features
+    } else {
+      showUnlockPrompt(); // show payment button
+    }
+  });
+
 
 function getAverageRGB(data) {
   const sum = [0, 0, 0];
@@ -165,26 +176,36 @@ function saveJSONFile(filename) {
   link.click();
 }
 
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+function validateLicenseToken(token, currentDeviceId) {
+  const decoded = atob(token); // base64 decode
+  const [orderId, deviceId, issuedAt, signature] = decoded.split("|");
+
+  return deviceId === currentDeviceId; // basic check
+}
+
+
+async function initiatePayment() {
+  const deviceId = getDeviceId(); // your fingerprinting logic
+  const orderId = `shade_${Date.now()}`;
+  const amount = 499; // ₹499 or your chosen price
+
+  try {
+    const response = await fetch("https://digital-shade-guide.vercel.app/api/initiate-payment/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, amount, deviceId })
+    });
+
+    const data = await response.json();
+    if (data.paymentUrl) {
+      window.open(data.paymentUrl, "_blank");
+    } else {
+      alert("⚠️ Payment initiation failed. Please try again.");
+    }
+  } catch (err) {
+    console.error("Payment error:", err);
+    alert("🚫 Unable to connect to payment server.");
   }
-
-  const { orderId, amount, deviceId } = req.body;
-
-  const ACCOUNT_ID = process.env.ACCOUNT_ID;
-  const SECRET_KEY = process.env.SECRET_KEY;
-
-  if (!ACCOUNT_ID || !SECRET_KEY) {
-    return res.status(500).json({ error: "Missing credentials" });
-  }
-
-  const payloadStr = `${ACCOUNT_ID}|${orderId}|${amount}|${deviceId}`;
-  const crypto = await import("crypto");
-  const hash = crypto.createHmac("sha256", SECRET_KEY).update(payloadStr).digest("hex");
-
-  const paymentUrl = `https://zerotize.in/pay?order_id=${orderId}&hash=${hash}`;
-  res.status(200).json({ paymentUrl });
 }
 
 document.getElementById("payBtn").onclick = initiatePayment;
