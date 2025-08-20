@@ -183,6 +183,9 @@ function validateLicenseToken(token, currentDeviceId) {
 
   return deviceId === currentDeviceId; // basic check
 }
+function showUnlockPrompt() {
+  alert("🔒 Please complete payment to unlock shade detection.");
+}
 
 
 async function initiatePayment() {
