@@ -41,6 +41,8 @@ export default async function handler(req, res) {
     const payloadStr = `${ACCOUNT_ID}|${orderId}|${amount}|${deviceId}`;
 
     const hash = crypto.createHmac("sha256", SECRET_KEY).update(payloadStr).digest("hex");
+    console.log("Zerotize payload:", payloadStr);
+    console.log("Generated hash:", hash);
 
     const paymentUrl = `https://zerotize.in/pay?order_id=${orderId}&hash=${hash}`;
     res.status(200).json({ paymentUrl });
