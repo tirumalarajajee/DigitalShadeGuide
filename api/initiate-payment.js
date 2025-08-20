@@ -1,6 +1,10 @@
 // File: /api/initiate-payment.js
 
 export default async function handler(req, res) {
+res.setHeader("Access-Control-Allow-Origin", "https://digital-shade-guide-git-main-tirumalarajajees-projects.vercel.app/"); // or your domain
+res.setHeader("Access-Control-Allow-Methods", "POST");
+res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -31,9 +35,6 @@ export default async function handler(req, res) {
     console.error("Function error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
-res.setHeader("Access-Control-Allow-Origin", "https://digital-shade-guide-git-main-tirumalarajajees-projects.vercel.app/"); // or your domain
-res.setHeader("Access-Control-Allow-Methods", "POST");
-res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
 }
 
