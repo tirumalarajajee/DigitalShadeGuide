@@ -54,14 +54,13 @@
 
 
  <script>
-window.addEventListener("load", () => {
-  startTrialIfNeeded();
-  checkLicense();
-});
+
 
  if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js');
+      startTrialIfNeeded();
+      checkLicense();
     });
   }
 const video = document.getElementById("camera");
