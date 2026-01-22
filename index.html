@@ -1,15 +1,11 @@
 <!DOCTYPE html>
-
-
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Tooth Shade Detection</title>
-<link rel="manifest" href="manifest.json" />
   <style>
     body { font-family: sans-serif; text-align: center; background: #f0f0f0; }
-    #camera { display: none; } /* hidden video stream */
-    #snapshot { border: 1px solid #000; display: block; margin: 10px auto; }
+    #camera, #snapshot { display: block; margin: 10px auto; }
     #confidenceFill {
       height: 20px;
       background: gray;
@@ -21,11 +17,10 @@
   </style>
 </head>
 <body>
+
   <h2>🦷 Detection Mode</h2>
   <video id="camera" autoplay playsinline width="640" height="480"></video>
-  <canvas id="snapshot" width="640" height="480"></canvas>
-<!-- Add this input for dynamic patient naming -->
-<input type="text" id="patientNameInput" placeholder="Enter patient name" />
+  <canvas id="snapshot" width="640" height="480" style="border:1px solid #000;"></canvas>
 
   <br />
   <label for="modeSelector">Detection Mode:</label>
@@ -38,142 +33,178 @@
   <p id="liveShade">Shade: ---</p>
   <div id="confidenceFill">ΔE00: ---</div>
 
-
-
   <br />
   <button id="saveSingle">Save Single</button>
   <button id="saveRegion">Save Region</button>
   <button id="saveMerge">Save Merged</button>
-<button id="shareBtn">Share via WhatsApp</button>
 
-<select id="sourceSelector">
-  <option value="desktop">Desktop Camera</option>
-  <option value="android">Android Stream</option>
-</select>
+  <script>
+    const webShades = {
+     "A1": [
+    206.3435546875,
+    213.651328125,
+    205.61953125
+  ],
+  "A2": [
+    199.3373046875,
+    204.9614453125,
+    182.587109375
+  ],
+  "A3": [
+    193.4927734375,
+    198.4073046875,
+    165.14578125
+  ],
+  "A3.5": [
+    183.8644140625,
+    188.98484375,
+    137.4994140625
+  ],
+  "A4": [
+    160.5948046875,
+    166.25421875,
+    115.1146875
+  ],
+  "B1": [
+    203.550859375,
+    213.354765625,
+    200.0873828125
+  ],
+  "B2": [
+    208.1788671875,
+    212.1940234375,
+    190.101015625
+  ],
+  "B3": [
+    188.4376953125,
+    190.24078125,
+    145.208359375
+  ],
+  "B4": [
+    191.410234375,
+    194.9437109375,
+    140.5097265625
+  ],
+  "C1": [
+    191.1158203125,
+    198.8146875,
+    186.383515625
+  ],
+  "C2": [
+    186.2761328125,
+    189.9271484375,
+    161.470078125
+  ],
+  "C3": [
+    172.377421875,
+    174.59515625,
+    139.6975390625
+  ],
+  "C4": [
+    147.819375,
+    154.44265625,
+    107.7923828125
+  ],
+  "D2": [
+    184.547265625,
+    191.4240234375,
+    180.4969140625
+  ],
+  "D3": [
+    179.7816796875,
+    183.7228515625,
+    163.6978125
+  ],
+  "D4": [
+    175.4851953125,
+    179.9959765625,
+    144.659609375
+  ]
+    };
 
+    const regions = {
+      region: ["Incisal", "Middle", "Cervical"],
+      merge: ["Mesial", "Prime", "Distal"]
+    };
 
+    let regionIndex = 0;
+    const video = document.getElementById("camera");
+    const canvas = document.getElementById("snapshot");
+    const ctx = canvas.getContext("2d");
+    const modeSelector = document.getElementById("modeSelector");
+    const shadeLive = document.getElementById("liveShade");
+    const confidenceFill = document.getElementById("confidenceFill");
 
-<script>
-const video = document.getElementById("camera");
-const canvas = document.getElementById("snapshot");
-const ctx = canvas.getContext("2d");
-const shadeLive = document.getElementById("liveShade");
-const confidenceFill = document.getElementById("confidenceFill");
-const sourceSelector = document.getElementById("sourceSelector");
-
-let currentSource = "desktop"; // default
-let frameCount = 0;
-
-/* ---------------------- Utility functions ---------------------- */
-function getAverageRGB(data) {
-  const sum = [0, 0, 0];
-  const count = data.length / 4;
-  for (let i = 0; i < data.length; i += 4) {
-    sum[0] += data[i];
-    sum[1] += data[i + 1];
-    sum[2] += data[i + 2];
-  }
-  return sum.map(v => v / count);
-}
-
-function rgbToLab([r, g, b]) {
-  [r, g, b] = [r, g, b].map(v => {
-    v /= 255;
-    return v > 0.04045 ? Math.pow((v + 0.055) / 1.055, 2.4) : v / 12.92;
-  });
-  let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
-  let y = (r * 0.2126 + g * 0.7152 + b * 0.0722);
-  let z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
-  [x, y, z] = [x, y, z].map(v => v > 0.008856 ? Math.pow(v, 1 / 3) : (7.787 * v + 16 / 116));
-  return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
-}
-
-const webShades = {
-  "A1":[206.3,213.6,205.6],"A2":[199.3,204.9,182.6],"A3":[193.5,198.4,165.1],
-  "A3.5":[183.9,188.9,137.5],"A4":[160.6,166.3,115.1],"B1":[203.6,213.4,200.1],
-  "B2":[208.2,212.2,190.1],"B3":[188.4,190.2,145.2],"B4":[191.4,194.9,140.5],
-  "C1":[191.1,198.8,186.4],"C2":[186.3,189.9,161.5],"C3":[172.4,174.6,139.7],
-  "C4":[147.8,154.4,107.8],"D2":[184.5,191.4,180.5],"D3":[179.8,183.7,163.7],
-  "D4":[175.5,180.0,144.7]
-};
-
-function findClosestShade(rgb) {
-  const sampleLab = rgbToLab(rgb);
-  let minDelta = Infinity, bestShade = "---";
-  for (const shade in webShades) {
-    const lab = rgbToLab(webShades[shade]);
-    const delta = Math.sqrt(sampleLab.reduce((sum, v, i) => sum + Math.pow(v - lab[i], 2), 0));
-    if (delta < minDelta) {
-      minDelta = delta;
-      bestShade = shade;
+    function getRegionLabel(mode) {
+      if (mode === "single") return "Whole";
+      const list = regions[mode];
+      return list[regionIndex++ % list.length];
     }
-  }
-  return [bestShade, minDelta];
-}
 
-/* ---------------------- Shade detection ---------------------- */
-function processCanvasFrame() {
-  const r = 80;
-  const roiX = canvas.width / 2;
-  const roiY = canvas.height / 2;
-  const data = ctx.getImageData(roiX - r, roiY - r, r * 2, r * 2).data;
-  const avg = getAverageRGB(data);
-  const [shade, delta] = findClosestShade(avg);
+    function getAverageRGB(data) {
+      const pixels = [];
+      for (let i = 0; i < data.length; i += 4) {
+        pixels.push([data[i], data[i + 1], data[i + 2]]);
+      }
+      return pixels.reduce((a, b) => a.map((v, i) => v + b[i]), [0, 0, 0])
+                   .map(v => v / pixels.length);
+    }
 
-  shadeLive.textContent = `Detected Shade: ${shade}`;
-  confidenceFill.textContent = `ΔE00: ${delta.toFixed(2)}`;
-  confidenceFill.style.backgroundColor = delta < 3 ? "green" : delta < 6 ? "orange" : "red";
-}
+    function rgbToLab([r, g, b]) {
+      [r, g, b] = [r, g, b].map(v => {
+        v /= 255;
+        return v > 0.04045 ? Math.pow((v + 0.055) / 1.055, 2.4) : v / 12.92;
+      });
+      let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+      let y = (r * 0.2126 + g * 0.7152 + b * 0.0722);
+      let z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+      [x, y, z] = [x, y, z].map(v => v > 0.008856 ? Math.pow(v, 1/3) : (7.787 * v) + 16/116);
+      return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
+    }
 
-/* ---------------------- Android -> JS bridge ---------------------- */
-window.receiveFrame = function(base64Url) {
-  if (currentSource !== "android") return;
-  const img = new Image();
-  img.onload = () => {
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    processCanvasFrame();
-  };
-  img.src = base64Url;
-};
-
-/* ---------------------- Desktop camera loop ---------------------- */
-function startDesktopCamera() {
-  navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream => {
-      video.srcObject = stream;
-      video.onloadedmetadata = () => {
-        function drawLoop() {
-          if (currentSource !== "desktop") return; // stop loop if switched
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          processCanvasFrame();
-          console.log("Frame", frameCount++); // debug
-          requestAnimationFrame(drawLoop);
+    function findClosestShade(rgb) {
+      const sampleLab = rgbToLab(rgb);
+      let minDelta = Infinity, bestShade = "---";
+      for (const shade in webShades) {
+        const lab = rgbToLab(webShades[shade]);
+        const delta = Math.sqrt(sampleLab.reduce((sum, v, i) => sum + Math.pow(v - lab[i], 2), 0));
+        if (delta < minDelta) {
+          minDelta = delta;
+          bestShade = shade;
         }
-        drawLoop();
-      };
-    })
-    .catch(err => {
-      console.error("Camera error:", err);
-    });
-}
-
-/* ---------------------- Source switching ---------------------- */
-sourceSelector.onchange = () => {
-  currentSource = sourceSelector.value;
-  if (currentSource === "desktop") {
-    startDesktopCamera();
-  } else {
-    // stop video stream if running
-    if (video.srcObject) {
-      video.srcObject.getTracks().forEach(track => track.stop());
-      video.srcObject = null;
+      }
+      return [bestShade, minDelta];
     }
-  }
-};
 
-// 🔹 Default start with desktop camera
-sourceSelector.value = "desktop";
-sourceSelector.onchange();
-</script>
+    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } }).then(stream => {
+      video.srcObject = stream;
+
+      setInterval(() => {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const radius = 80;
+        const data = ctx.getImageData(canvas.width/2 - radius, canvas.height/2 - radius, radius*2, radius*2).data;
+        const avg = getAverageRGB(data);
+        const [shade, delta] = findClosestShade(avg);
+        const region = getRegionLabel(modeSelector.value);
+
+        shadeLive.textContent = `Shade: ${shade} | Region: ${region}`;
+        confidenceFill.textContent = `ΔE00: ${delta.toFixed(2)}`;
+        confidenceFill.style.width = Math.min(100, 100 - delta * 5) + "%";
+        confidenceFill.style.backgroundColor = delta < 3 ? "green" : delta < 6 ? "orange" : "red";
+      }, 100);
+    });
+
+    function saveModeSnapshot(mode) {
+      const snapshotURL = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      a.href = snapshotURL;
+      a.download = `${mode}_shade_${Date.now()}.png`;
+      a.click();
+    }
+
+    document.getElementById("saveSingle").onclick = () => saveModeSnapshot("single");
+    document.getElementById("saveRegion").onclick = () => saveModeSnapshot("region");
+    document.getElementById("saveMerge").onclick = () => saveModeSnapshot("merge");
+  </script>
 </body>
 </html>
