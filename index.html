@@ -510,12 +510,15 @@ async function loadShadesFromDB(db) {
       video.srcObject = stream;
 
       setInterval(() => {
+        if (!session || !session.steps) return;
+
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const radius = 80;
         const data = ctx.getImageData(canvas.width/2 - radius, canvas.height/2 - radius, radius*2, radius*2).data;
         const avg = getAverageRGB(data);
         const [shade, delta] = findClosestShade(avg);
-        const region = getRegionLabel(modeSelector.value);
+        const region = session?.steps?.[session.currentIndex] || "---";
+
 
         shadeLive.textContent = `Shade: ${shade} | Region: ${region}`;
         confidenceFill.textContent = `ΔE00: ${delta.toFixed(2)}`;
