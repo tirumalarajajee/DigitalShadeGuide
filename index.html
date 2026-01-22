@@ -66,33 +66,45 @@ const DB_VERSION = 1;
 const SHADE_STORE = "shades";
 const META_STORE = "meta";
 
+
+
 function speakShade(shade, delta) {
-  if (!("speechSynthesis" in window)) return;
+  console.log("[Speech] speakShade called:", shade, "Δ", delta.toFixed(2));
 
-  const now = Date.now();
-
-  // Prevent rapid repeats
-  if (shade === lastSpokenShade && now - lastSpokenTime < SPEAK_INTERVAL_MS) {
+  if (!speechUnlocked) {
+    console.warn("[Speech] Blocked: speech not unlocked yet");
     return;
   }
 
-  // Confidence gate (adjust as needed)
-  if (delta > 6) return;
+  if (!("speechSynthesis" in window)) {
+    console.error("[Speech] Web Speech API not supported");
+    return;
+  }
 
-  const utterance = new SpeechSynthesisUtterance(
-    `Detected shade ${shade}`
-  );
+  if (!shade || shade === "---") {
+    console.warn("[Speech] Invalid shade, skipping");
+    return;
+  }
+
+  if (shade === lastSpokenShade) {
+    console.log("[Speech] Same shade as last, skipping");
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(shade);
 
   utterance.rate = 0.9;
   utterance.pitch = 1.0;
   utterance.volume = 1.0;
 
-  window.speechSynthesis.cancel(); // stop previous speech
-  window.speechSynthesis.speak(utterance);
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utterance);
 
   lastSpokenShade = shade;
-  lastSpokenTime = now;
+
+  console.log("[Speech] Speaking shade:", shade);
 }
+
 
 
 let webShades = {}; // will be populated from IndexedDB
