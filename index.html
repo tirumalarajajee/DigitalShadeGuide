@@ -27,6 +27,8 @@
   <canvas id="snapshot" width="640" height="480" style="border:1px solid #000;"></canvas>
 
   <br />
+
+  <input type="text" id="patient" placeholder="Patient Name">
  <!-- Capture workflow -->
 <label for="captureType">Capture Type:</label>
 <select id="captureType">
@@ -52,6 +54,10 @@
   <button id="saveMerge">Save Merged</button>
 
   <script>
+document.addEventListener("DOMContentLoaded", () => {
+  initCameraSystem();
+  initCaptureWorkflow();
+});
 
 
     const cameraSelect = document.getElementById("cameraSelect");
@@ -128,8 +134,31 @@ let session = {
   currentIndex: 0,
   captures: []
 };
+document.getElementById("captureBtn").onclick = handleCapture;
+function initCaptureWorkflow() {
+  const captureTypeEl = document.getElementById("captureType");
+  const patientEl = document.getElementById("patient");
+
+  if (!captureTypeEl) {
+    console.error("[Init] captureType element not found");
+    return;
+  }
+
+  if (!patientEl) {
+    console.error("[Init] patient input not found");
+    return;
+  }
+
+  captureTypeEl.addEventListener("change", () => {
+    startSession(captureTypeEl.value, patientEl.value);
+  });
+}
 
 function startSession(captureType, patientName) {
+  if (!captureType) {
+    console.warn("[Session] captureType missing");
+    return;
+  }
   session.patient = patientName || "Unknown";
   session.type = captureType;
   session.steps = CAPTURE_WORKFLOWS[captureType];
@@ -166,7 +195,7 @@ async function handleCapture() {
     finalizeSession();
   }
 }
-document.getElementById("captureBtn").onclick = handleCapture;
+
 
 async function captureFrameAndAnalyze(region) {
   const canvas = document.getElementById("canvas");
