@@ -144,7 +144,17 @@ let session = {
   currentIndex: 0,
   captures: []
 };
-document.getElementById("captureBtn").onclick = handleCapture;
+document.getElementById("captureBtn").onclick = () => {
+  if (!session.steps.length) {
+    const captureType = document.getElementById("captureType").value;
+    const patientName = document.getElementById("patient").value;
+    console.log("🟢 Auto-starting session", captureType, patientName);
+    startSession(captureType, patientName);
+  }
+  handleCapture();
+};
+
+
 function initCaptureWorkflow() {
   const captureTypeEl = document.getElementById("captureType");
   const patientEl = document.getElementById("patient");
@@ -271,17 +281,39 @@ function blobToBase64(blob) {
 }
 
 function downloadJSON(filename, data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: "application/json"
-  });
+  console.log("[Download] JSON:", filename);
+
+  const blob = new Blob(
+    [JSON.stringify(data, null, 2)],
+    { type: "application/json" }
+  );
+
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename.replace(/[:]/g, "-");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
   a.click();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 100);
 }
 
+
 function finalizeSession() {
-  const timestamp = new Date().toISOString();
+  console.log("🔥 finalizeSession CALLED", JSON.stringify(session));
+
+  const timestamp = new Date().toISOString().replace(/[:]/g, "-");
+
+  console.log("[Finalize] Session type:", session.type);
+  console.log("[Finalize] Captures:", session.captures);
+
+  if (!session.captures.length) {
+    console.error("[Finalize] No captures, aborting");
+    return;
+  }
 
   if (session.type === "single") {
     const record = {
@@ -292,16 +324,20 @@ function finalizeSession() {
       delta: session.captures[0].delta
     };
 
+    console.log("[Finalize] Creating JSON:", record);
+
     downloadJSON(
       `${session.patient}_${timestamp}.json`,
       record
     );
+
     resetSession();
     return;
   }
 
   exportZipSession(timestamp);
 }
+
 function exportZipSession(timestamp) {
   const zip = new JSZip();
   const root = zip.folder(
