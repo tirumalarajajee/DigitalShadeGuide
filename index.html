@@ -60,6 +60,11 @@ document.addEventListener("DOMContentLoaded", () => {
   initCameraSystem();
   initCaptureWorkflow();
 });
+const snapshotCanvas = document.getElementById("snapshot");
+const snapshotCtx = snapshotCanvas.getContext("2d");
+if (!snapshotCanvas) {
+  throw new Error("Snapshot canvas missing in DOM");
+}
 
 
     const cameraSelect = document.getElementById("cameraSelect");
@@ -248,15 +253,14 @@ async function handleCapture() {
 
 
 async function captureFrameAndAnalyze(region) {
-  const canvas = document.getElementById("snapshot");
-if (!canvas) {
-  console.error("[Capture] snapshot canvas not found");
-  return;
-}
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, 80, 40, 160, 160, 0, 0, 160, 160);
+ if (!snapshotCanvas || !snapshotCtx) {
+    console.error("[Capture] Snapshot canvas not available");
+    return null;
+  }
 
-  const imageData = ctx.getImageData(0, 0, 160, 160).data;
+  snapshotCtx.drawImage(video, 80, 40, 160, 160, 0, 0, 160, 160);
+
+  const imageData = snapshotCtx.getImageData(0, 0, 160, 160).data;
 
   let r=0,g=0,b=0,c=0;
   for (let i=0;i<imageData.length;i+=4) {
