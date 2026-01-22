@@ -19,6 +19,8 @@
   </style>
 </head>
 <body>
+<label for="cameraSelect">Camera:</label>
+<select id="cameraSelect"></select>
 
   <h2>🦷 Detection Mode</h2>
   <video id="camera" autoplay playsinline width="640" height="480"></video>
@@ -41,6 +43,65 @@
   <button id="saveMerge">Save Merged</button>
 
   <script>
+
+    const cameraSelect = document.getElementById("cameraSelect");
+let currentStream = null;
+
+async function populateCameraSelector() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const cameras = devices.filter(d => d.kind === "videoinput");
+
+  cameraSelect.innerHTML = "";
+
+  cameras.forEach(cam => {
+    const option = document.createElement("option");
+    option.value = cam.deviceId;
+    option.text = cam.label || "Camera";
+    cameraSelect.appendChild(option);
+  });
+
+  // Restore saved camera if exists
+  const savedCameraId = localStorage.getItem("preferredCameraId");
+  if (savedCameraId) {
+    cameraSelect.value = savedCameraId;
+  }
+}
+
+async function startCameraById(deviceId) {
+  if (currentStream) {
+    currentStream.getTracks().forEach(t => t.stop());
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      deviceId: deviceId ? { exact: deviceId } : undefined,
+      width: { ideal: 640 },
+      height: { ideal: 480 }
+    }
+  });
+
+  currentStream = stream;
+  video.srcObject = stream;
+}
+cameraSelect.onchange = async () => {
+  const id = cameraSelect.value;
+  localStorage.setItem("preferredCameraId", id);
+  console.log("[Camera] User selected:", id);
+  await startCameraById(id);
+};
+async function initCameraSystem() {
+  await populateCameraSelector();
+
+  const savedCameraId = localStorage.getItem("preferredCameraId");
+  if (savedCameraId) {
+    console.log("[Camera] Restoring saved camera");
+    await startCameraById(savedCameraId);
+  } else {
+    console.log("[Camera] No saved camera, using default");
+    await startCameraById(null);
+  }
+}
+
 
 let speechUnlocked = false;
 
@@ -67,38 +128,7 @@ const SHADE_STORE = "shades";
 const META_STORE = "meta";
 
 
-async function startCameraUniversal() {
-  let constraints = { video: true };
 
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const cams = devices.filter(d => d.kind === "videoinput");
-
-    const usbCam = cams.find(d =>
-      /usb|uvc|endoscope|camera/i.test(d.label) &&
-      !/integrated|built-in|laptop/i.test(d.label)
-    );
-
-    if (usbCam) {
-      constraints = {
-        video: {
-          deviceId: { exact: usbCam.deviceId },
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
-      };
-      console.log("[Camera] USB camera requested:", usbCam.label);
-    } else {
-      console.warn("[Camera] USB camera not found; using browser selection");
-    }
-
-  } catch (e) {
-    console.warn("[Camera] enumerateDevices failed, fallback mode", e);
-  }
-
-  const stream = await navigator.mediaDevices.getUserMedia(constraints);
-  video.srcObject = stream;
-}
 
 
 function speakShade(shade, delta) {
@@ -317,7 +347,8 @@ async function loadShadesFromDB(db) {
     document.getElementById("saveRegion").onclick = () => saveModeSnapshot("region");
     document.getElementById("saveMerge").onclick = () => saveModeSnapshot("merge");
 
-    startCameraUniversal();
+    initCameraSystem();
+
 
 
     syncShades();
