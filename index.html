@@ -41,10 +41,45 @@
   <button id="saveMerge">Save Merged</button>
 
   <script>
+
+let lastSpokenShade = null;
+let lastSpokenTime = 0;
+const SPEAK_INTERVAL_MS = 3000; // minimum gap between announcements
+
+
    const DB_NAME = "DigitalShadeDB";
 const DB_VERSION = 1;
 const SHADE_STORE = "shades";
 const META_STORE = "meta";
+
+function speakShade(shade, delta) {
+  if (!("speechSynthesis" in window)) return;
+
+  const now = Date.now();
+
+  // Prevent rapid repeats
+  if (shade === lastSpokenShade && now - lastSpokenTime < SPEAK_INTERVAL_MS) {
+    return;
+  }
+
+  // Confidence gate (adjust as needed)
+  if (delta > 6) return;
+
+  const utterance = new SpeechSynthesisUtterance(
+    `Detected shade ${shade}`
+  );
+
+  utterance.rate = 0.9;
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
+
+  window.speechSynthesis.cancel(); // stop previous speech
+  window.speechSynthesis.speak(utterance);
+
+  lastSpokenShade = shade;
+  lastSpokenTime = now;
+}
+
 
 let webShades = {}; // will be populated from IndexedDB
 
@@ -189,6 +224,7 @@ async function loadShadesFromDB(db) {
           bestShade = shade;
         }
       }
+       speakShade(bestShade, minDelta);
       return [bestShade, minDelta];
     }
 
