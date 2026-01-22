@@ -67,34 +67,38 @@ const SHADE_STORE = "shades";
 const META_STORE = "meta";
 
 
-async function startUsbCameraEdge() {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const cams = devices.filter(d => d.kind === "videoinput");
+async function startCameraUniversal() {
+  let constraints = { video: true };
 
-  console.table(cams.map(c => c.label));
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d => d.kind === "videoinput");
 
-  const usbCam = cams.find(c =>
-    /usb|uvc|endoscope|camera/i.test(c.label) &&
-    !/integrated|built-in|laptop/i.test(c.label)
-  );
+    const usbCam = cams.find(d =>
+      /usb|uvc|endoscope|camera/i.test(d.label) &&
+      !/integrated|built-in|laptop/i.test(d.label)
+    );
 
-  if (!usbCam) {
-    console.warn("[Camera] USB camera not found, using default");
+    if (usbCam) {
+      constraints = {
+        video: {
+          deviceId: { exact: usbCam.deviceId },
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      };
+      console.log("[Camera] USB camera requested:", usbCam.label);
+    } else {
+      console.warn("[Camera] USB camera not found; using browser selection");
+    }
+
+  } catch (e) {
+    console.warn("[Camera] enumerateDevices failed, fallback mode", e);
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      deviceId: usbCam ? { exact: usbCam.deviceId } : undefined,
-      width: { ideal: 640 },
-      height: { ideal: 480 }
-    }
-  });
-
+  const stream = await navigator.mediaDevices.getUserMedia(constraints);
   video.srcObject = stream;
-
-  console.log("[Camera] Using:", usbCam?.label || "default");
 }
-
 
 
 function speakShade(shade, delta) {
@@ -313,7 +317,7 @@ async function loadShadesFromDB(db) {
     document.getElementById("saveRegion").onclick = () => saveModeSnapshot("region");
     document.getElementById("saveMerge").onclick = () => saveModeSnapshot("merge");
 
-    startUsbCameraEdge();
+    startCameraUniversal();
 
 
     syncShades();
