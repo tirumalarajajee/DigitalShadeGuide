@@ -52,6 +52,7 @@
   <button id="saveSingle">Save Single</button>
   <button id="saveRegion">Save Region</button>
   <button id="saveMerge">Save Merged</button>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
   <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -118,6 +119,14 @@ async function initCameraSystem() {
   }
 }
 
+function speak(text) {
+  if (!speechUnlocked) return;
+  const u = new SpeechSynthesisUtterance(text);
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+
+
 const CAPTURE_WORKFLOWS = {
   single: ["center"],
 
@@ -155,18 +164,27 @@ function initCaptureWorkflow() {
 }
 
 function startSession(captureType, patientName) {
+  if (!patientName || patientName.trim().length < 2) {
+    speak("Please enter patient name before starting");
+    alert("Please enter patient name");
+    return;
+  }
+
   if (!captureType) {
     console.warn("[Session] captureType missing");
     return;
   }
-  session.patient = patientName || "Unknown";
+
+  session.patient = patientName.trim();
   session.type = captureType;
   session.steps = CAPTURE_WORKFLOWS[captureType];
   session.currentIndex = 0;
   session.captures = [];
 
+  speakInstruction();
   updateInstruction();
 }
+
 function updateInstruction() {
   const step = session.steps[session.currentIndex];
   const textMap = {
@@ -181,8 +199,26 @@ function updateInstruction() {
   document.getElementById("instruction").innerText =
     `Place camera at: ${textMap[step]}`;
 }
+function speakInstruction() {
+  const step = session.steps[session.currentIndex];
+
+  const speechMap = {
+    center: "Place camera at the center of the tooth",
+    incisal: "Place camera at incisal third",
+    middle: "Incisal captured. Move sensor to middle third",
+    cervical: "Middle captured. Move sensor to cervical third",
+    mesial: "Place camera at mesial tooth",
+    distal: "Mesial captured. Move sensor to distal tooth"
+  };
+
+  const text = speechMap[step];
+  if (text) speak(text);
+}
+
 async function handleCapture() {
   const region = session.steps[session.currentIndex];
+
+  speak(`${region} captured`);
 
   const result = await captureFrameAndAnalyze(region);
   session.captures.push(result);
@@ -191,10 +227,13 @@ async function handleCapture() {
 
   if (session.currentIndex < session.steps.length) {
     updateInstruction();
+    speakInstruction();
   } else {
+    speak("All regions captured. Saving file.");
     finalizeSession();
   }
 }
+
 
 
 async function captureFrameAndAnalyze(region) {
@@ -229,6 +268,17 @@ function blobToBase64(blob) {
     reader.readAsDataURL(blob);
   });
 }
+
+function downloadJSON(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json"
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename.replace(/[:]/g, "-");
+  a.click();
+}
+
 function finalizeSession() {
   const timestamp = new Date().toISOString();
 
@@ -506,26 +556,28 @@ async function loadShadesFromDB(db) {
       return [bestShade, minDelta];
     }
 
-    navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } }).then(stream => {
-      video.srcObject = stream;
+    setInterval(() => {
+  if (!currentStream || !session || !session.steps.length) return;
 
-      setInterval(() => {
-        if (!session || !session.steps) return;
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const radius = 80;
-        const data = ctx.getImageData(canvas.width/2 - radius, canvas.height/2 - radius, radius*2, radius*2).data;
-        const avg = getAverageRGB(data);
-        const [shade, delta] = findClosestShade(avg);
-        const region = session?.steps?.[session.currentIndex] || "---";
+  const radius = 80;
+  const data = ctx.getImageData(
+    canvas.width / 2 - radius,
+    canvas.height / 2 - radius,
+    radius * 2,
+    radius * 2
+  ).data;
 
+  const avg = getAverageRGB(data);
+  const [shade, delta] = findClosestShade(avg);
+  const region = session.steps[session.currentIndex] || "---";
 
-        shadeLive.textContent = `Shade: ${shade} | Region: ${region}`;
-        confidenceFill.textContent = `ΔE00: ${delta.toFixed(2)}`;
-        confidenceFill.style.width = Math.min(100, 100 - delta * 5) + "%";
-        confidenceFill.style.backgroundColor = delta < 3 ? "green" : delta < 6 ? "orange" : "red";
-      }, 100);
-    });
+  shadeLive.textContent = `Shade: ${shade} | Region: ${region}`;
+  confidenceFill.textContent = `ΔE00: ${delta.toFixed(2)}`;
+  confidenceFill.style.backgroundColor =
+    delta < 3 ? "green" : delta < 6 ? "orange" : "red";
+}, 150);
 
     function saveModeSnapshot(mode) {
       const snapshotURL = canvas.toDataURL("image/png");
