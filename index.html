@@ -52,7 +52,8 @@
   <button id="saveSingle">Save Single</button>
   <button id="saveRegion">Save Region</button>
   <button id="saveMerge">Save Merged</button>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="js/jszip.min.js"></script>
+
 
   <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -557,7 +558,7 @@ async function loadShadesFromDB(db) {
     }
 
     setInterval(() => {
-  if (!currentStream || !session || !session.steps.length) return;
+  if (!currentStream) return;
 
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
