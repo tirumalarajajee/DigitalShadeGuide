@@ -27,12 +27,21 @@
   <canvas id="snapshot" width="640" height="480" style="border:1px solid #000;"></canvas>
 
   <br />
-  <label for="modeSelector">Detection Mode:</label>
-  <select id="modeSelector">
-    <option value="single">Single</option>
-    <option value="region">Region</option>
-    <option value="merge">Merged</option>
-  </select>
+ <!-- Capture workflow -->
+<label for="captureType">Capture Type:</label>
+<select id="captureType">
+  <option value="single">Single</option>
+  <option value="region">Region-wise</option>
+  <option value="merge">Merged</option>
+</select>
+
+<br><br>
+
+<!-- Tooth region (used only for region/merge modes) -->
+<h3 id="instruction">Place camera at: —</h3>
+<button id="captureBtn">Capture</button>
+
+
 
   <p id="liveShade">Shade: ---</p>
   <div id="confidenceFill">ΔE00: ---</div>
@@ -43,6 +52,7 @@
   <button id="saveMerge">Save Merged</button>
 
   <script>
+
 
     const cameraSelect = document.getElementById("cameraSelect");
 let currentStream = null;
@@ -100,6 +110,156 @@ async function initCameraSystem() {
     console.log("[Camera] No saved camera, using default");
     await startCameraById(null);
   }
+}
+
+const CAPTURE_WORKFLOWS = {
+  single: ["center"],
+
+  region: ["incisal", "middle", "cervical"],
+
+  merge: ["mesial", "distal"]
+};
+
+
+let session = {
+  patient: null,
+  type: null,
+  steps: [],
+  currentIndex: 0,
+  captures: []
+};
+
+function startSession(captureType, patientName) {
+  session.patient = patientName || "Unknown";
+  session.type = captureType;
+  session.steps = CAPTURE_WORKFLOWS[captureType];
+  session.currentIndex = 0;
+  session.captures = [];
+
+  updateInstruction();
+}
+function updateInstruction() {
+  const step = session.steps[session.currentIndex];
+  const textMap = {
+    center: "Center of the tooth",
+    incisal: "Incisal third",
+    middle: "Middle third",
+    cervical: "Cervical third",
+    mesial: "Mesial tooth",
+    distal: "Distal tooth"
+  };
+
+  document.getElementById("instruction").innerText =
+    `Place camera at: ${textMap[step]}`;
+}
+async function handleCapture() {
+  const region = session.steps[session.currentIndex];
+
+  const result = await captureFrameAndAnalyze(region);
+  session.captures.push(result);
+
+  session.currentIndex++;
+
+  if (session.currentIndex < session.steps.length) {
+    updateInstruction();
+  } else {
+    finalizeSession();
+  }
+}
+document.getElementById("captureBtn").onclick = handleCapture;
+
+async function captureFrameAndAnalyze(region) {
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 80, 40, 160, 160, 0, 0, 160, 160);
+
+  const imageData = ctx.getImageData(0, 0, 160, 160).data;
+
+  let r=0,g=0,b=0,c=0;
+  for (let i=0;i<imageData.length;i+=4) {
+    r+=imageData[i]; g+=imageData[i+1]; b+=imageData[i+2]; c++;
+  }
+  r/=c; g/=c; b/=c;
+
+  const [shade, delta] = findClosestShade([r,g,b]);
+
+  const imageBlob = await new Promise(res => canvas.toBlob(res, "image/jpeg"));
+  const base64 = await blobToBase64(imageBlob);
+
+  return {
+    region,
+    shade,
+    delta: delta.toFixed(2),
+    image: base64
+  };
+}
+function blobToBase64(blob) {
+  return new Promise(res => {
+    const reader = new FileReader();
+    reader.onloadend = () => res(reader.result.split(",")[1]);
+    reader.readAsDataURL(blob);
+  });
+}
+function finalizeSession() {
+  const timestamp = new Date().toISOString();
+
+  if (session.type === "single") {
+    const record = {
+      patient: session.patient,
+      type: "single",
+      timestamp,
+      shade: session.captures[0].shade,
+      delta: session.captures[0].delta
+    };
+
+    downloadJSON(
+      `${session.patient}_${timestamp}.json`,
+      record
+    );
+    resetSession();
+    return;
+  }
+
+  exportZipSession(timestamp);
+}
+function exportZipSession(timestamp) {
+  const zip = new JSZip();
+  const root = zip.folder(
+    `${session.patient}_${session.type}_${timestamp}`
+  );
+
+  session.captures.forEach(c => {
+    root.file(`${c.region}.jpg`, c.image, { base64: true });
+  });
+
+  root.file(
+    "result.json",
+    JSON.stringify({
+      patient: session.patient,
+      type: session.type,
+      timestamp,
+      captures: session.captures
+    }, null, 2)
+  );
+
+  zip.generateAsync({ type: "blob" }).then(blob => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${session.patient}_${timestamp}.zip`;
+    a.click();
+  });
+
+  resetSession();
+}
+function resetSession() {
+  session = {
+    patient: null,
+    type: null,
+    steps: [],
+    currentIndex: 0,
+    captures: []
+  };
+  document.getElementById("instruction").innerText = "Session complete";
 }
 
 
