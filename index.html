@@ -42,6 +42,20 @@
 
   <script>
 
+let speechUnlocked = false;
+
+document.body.addEventListener("click", () => {
+  if (!speechUnlocked && "speechSynthesis" in window) {
+    const u = new SpeechSynthesisUtterance(" ");
+    speechSynthesis.speak(u);
+    speechUnlocked = true;
+    console.log("[Speech] Speech synthesis unlocked by user gesture");
+  }
+}, { once: true });
+
+
+
+
 let lastSpokenShade = null;
 let lastSpokenTime = 0;
 const SPEAK_INTERVAL_MS = 3000; // minimum gap between announcements
