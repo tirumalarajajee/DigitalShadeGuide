@@ -248,7 +248,11 @@ async function handleCapture() {
 
 
 async function captureFrameAndAnalyze(region) {
-  const canvas = document.getElementById("canvas");
+  const canvas = document.getElementById("snapshot");
+if (!canvas) {
+  console.error("[Capture] snapshot canvas not found");
+  return;
+}
   const ctx = canvas.getContext("2d");
   ctx.drawImage(video, 80, 40, 160, 160, 0, 0, 160, 160);
 
