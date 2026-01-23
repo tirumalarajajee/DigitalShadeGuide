@@ -170,7 +170,7 @@ document.getElementById("captureBtn").onclick = () => {
 
   if (sessionCompleted) {
     console.log("[Session] Completed, waiting for new case");
-    speakInstructionText("Session completed. Start new case.");
+    speak("Session completed. Start new case.");
     return;
   }
 
@@ -202,7 +202,7 @@ document.getElementById("newCaseBtn").onclick = () => {
   document.getElementById("instruction").innerText =
     "Enter patient name and select capture type";
 
-  speakInstructionText("New case started. Please enter patient name");
+  speak("New case started. Please enter patient name");
 };
 
 
