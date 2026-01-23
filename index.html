@@ -50,9 +50,7 @@
   <div id="confidenceFill">ΔE00: ---</div>
 
   <br />
-  <button id="saveSingle">Save Single</button>
-  <button id="saveRegion">Save Region</button>
-  <button id="saveMerge">Save Merged</button>
+  
 <script src="js/jszip.min.js"></script>
 
 
@@ -206,7 +204,9 @@ document.getElementById("captureBtn").onclick = () => {
   }
 
   if (!session.steps.length) {
-    const captureType = document.getElementById("captureType").value;
+    const captureType =
+      document.getElementById("captureType")?.value || "single";
+
     startSession(captureType, patientInput.value);
   }
 
@@ -216,9 +216,8 @@ document.getElementById("captureBtn").onclick = () => {
 
 
 
-document.getElementById("newCaseBtn").onclick = () => {
-  console.log("[UI] Aborting / starting new case");
 
+newCaseBtn.onclick = () => {
   speechSynthesis.cancel();
   instructionSpeaking = false;
 
@@ -264,21 +263,25 @@ function initCaptureWorkflow() {
 }
 
 function startSession(captureType, patientName) {
-  if (!patientName || patientName.trim().length === 0) {
-    speakInstructionText("Please enter patient name before capturing");
-    alert("Please enter patient name");
+
+  // 🔒 Enforce patient name
+  if (!patientName || !patientName.trim()) {
+    speak("Please enter patient name");
     return;
   }
+
+  // ✅ Auto-recognize captureType
+  const resolvedType = captureType || "single";
 
   sessionCompleted = false;
 
   session.patient = patientName.trim();
-  session.type = captureType;
-  session.steps = CAPTURE_WORKFLOWS[captureType];
+  session.type = resolvedType;
+  session.steps = CAPTURE_WORKFLOWS[resolvedType];
   session.currentIndex = 0;
   session.captures = [];
 
-  console.log("[Session] Started for patient:", session.patient);
+  console.log("[Session] Started", session.type, session.steps);
 
   updateInstruction();
   speakInstruction();
