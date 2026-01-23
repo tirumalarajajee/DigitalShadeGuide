@@ -41,7 +41,8 @@
 
 <!-- Tooth region (used only for region/merge modes) -->
 <h3 id="instruction">Place camera at: —</h3>
-<button id="captureBtn">Capture</button>
+<button id="captureBtn" disabled>Capture</button>
+<button id="newCaseBtn">Start New Case</button>
 
 
 
@@ -153,28 +154,55 @@ let session = {
   currentIndex: 0,
   captures: []
 };
+const patientInput = document.getElementById("patient");
+const captureBtn = document.getElementById("captureBtn");
+
+patientInput.addEventListener("input", () => {
+  const hasName = patientInput.value.trim().length > 0;
+  captureBtn.disabled = !hasName;
+
+  if (hasName) {
+    console.log("[UI] Patient name entered, capture enabled");
+  }
+});
+
 document.getElementById("captureBtn").onclick = () => {
 
-  const patientInput = document.getElementById("patient");
-  if (!patientInput || !patientInput.value.trim()) {
-    speakInstructionText("Please enter patient name");
-    alert("Please enter patient name");
-    return; // ✅ legal here (inside function)
-  }
-
-  // Prevent auto restart after completion
   if (sessionCompleted) {
-    console.log("[Session] Completed. Waiting for new start.");
+    console.log("[Session] Completed, waiting for new case");
+    speakInstructionText("Session completed. Start new case.");
     return;
   }
 
-  // Auto-start session if not started
   if (!session.steps.length) {
     const captureType = document.getElementById("captureType").value;
     startSession(captureType, patientInput.value);
   }
 
   handleCapture();
+};
+
+
+document.getElementById("newCaseBtn").onclick = () => {
+  console.log("[UI] Starting new case");
+
+  // Stop any ongoing speech
+  speechSynthesis.cancel();
+  instructionSpeaking = false;
+
+  // Reset session state
+  resetSession();
+  sessionCompleted = false;
+
+  // Clear patient input
+  patientInput.value = "";
+  captureBtn.disabled = true;
+
+  // Reset instruction text
+  document.getElementById("instruction").innerText =
+    "Enter patient name and select capture type";
+
+  speakInstructionText("New case started. Please enter patient name");
 };
 
 
@@ -403,11 +431,9 @@ function resetSession() {
     captures: []
   };
 
-  document.getElementById("instruction").innerText =
-    "Session complete. Select capture type to start again.";
-
   console.log("[Session] Reset complete");
 }
+
 
 
 
