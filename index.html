@@ -60,10 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initCameraSystem();
   initCaptureWorkflow();
 });
-if (!document.getElementById("patient").value.trim()) {
-  speakInstructionText("Please enter patient name");
-  return;
-}
+
 
 const snapshotCanvas = document.getElementById("snapshot");
 const snapshotCtx = snapshotCanvas.getContext("2d");
@@ -158,19 +155,28 @@ let session = {
 };
 document.getElementById("captureBtn").onclick = () => {
 
+  const patientInput = document.getElementById("patient");
+  if (!patientInput || !patientInput.value.trim()) {
+    speakInstructionText("Please enter patient name");
+    alert("Please enter patient name");
+    return; // ✅ legal here (inside function)
+  }
+
+  // Prevent auto restart after completion
   if (sessionCompleted) {
-    console.log("[Session] Previous session completed. Waiting for user.");
+    console.log("[Session] Completed. Waiting for new start.");
     return;
   }
 
+  // Auto-start session if not started
   if (!session.steps.length) {
     const captureType = document.getElementById("captureType").value;
-    const patientName = document.getElementById("patient").value;
-    startSession(captureType, patientName);
+    startSession(captureType, patientInput.value);
   }
 
   handleCapture();
 };
+
 
 function safeName(str) {
   return (str || "UnknownPatient")
