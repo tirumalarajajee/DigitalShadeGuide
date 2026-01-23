@@ -60,7 +60,39 @@
 document.addEventListener("DOMContentLoaded", () => {
   initCameraSystem();
   initCaptureWorkflow();
+  updateUIState(UI_STATE.IDLE);
+
 });
+const UI_STATE = {
+  IDLE: "idle",           // no case started
+  ACTIVE: "active",       // capture in progress
+  COMPLETED: "completed"  // case saved
+};
+
+let uiState = UI_STATE.IDLE;
+
+function updateUIState(state) {
+  uiState = state;
+
+  switch (state) {
+    case UI_STATE.IDLE:
+      captureBtn.disabled = true;
+      newCaseBtn.disabled = true;
+      break;
+
+    case UI_STATE.ACTIVE:
+      captureBtn.disabled = false;
+      newCaseBtn.disabled = false; // allow abort
+      break;
+
+    case UI_STATE.COMPLETED:
+      captureBtn.disabled = true;
+      newCaseBtn.disabled = false; // force new case
+      break;
+  }
+
+  console.log("[UI] State:", state);
+}
 
 
 const snapshotCanvas = document.getElementById("snapshot");
@@ -158,19 +190,18 @@ const patientInput = document.getElementById("patient");
 const captureBtn = document.getElementById("captureBtn");
 
 patientInput.addEventListener("input", () => {
-  const hasName = patientInput.value.trim().length > 0;
-  captureBtn.disabled = !hasName;
-
-  if (hasName) {
-    console.log("[UI] Patient name entered, capture enabled");
+  if (patientInput.value.trim()) {
+    updateUIState(UI_STATE.ACTIVE);
+  } else {
+    updateUIState(UI_STATE.IDLE);
   }
 });
 
+
 document.getElementById("captureBtn").onclick = () => {
 
-  if (sessionCompleted) {
-    console.log("[Session] Completed, waiting for new case");
-    speak("Session completed. Start new case.");
+  if (uiState === UI_STATE.COMPLETED) {
+    speak("Case completed. Start new case.");
     return;
   }
 
@@ -183,27 +214,27 @@ document.getElementById("captureBtn").onclick = () => {
 };
 
 
-document.getElementById("newCaseBtn").onclick = () => {
-  console.log("[UI] Starting new case");
 
-  // Stop any ongoing speech
+
+document.getElementById("newCaseBtn").onclick = () => {
+  console.log("[UI] Aborting / starting new case");
+
   speechSynthesis.cancel();
   instructionSpeaking = false;
 
-  // Reset session state
   resetSession();
   sessionCompleted = false;
 
-  // Clear patient input
   patientInput.value = "";
-  captureBtn.disabled = true;
-
-  // Reset instruction text
   document.getElementById("instruction").innerText =
-    "Enter patient name and select capture type";
+    "Enter patient name to start new case";
+
+  updateUIState(UI_STATE.IDLE);
 
   speak("New case started. Please enter patient name");
 };
+
+
 
 
 function safeName(str) {
@@ -371,8 +402,9 @@ function finalizeSession() {
   const timestamp = new Date().toISOString().replace(/[:]/g, "-");
 
   sessionCompleted = true;
-   // 🔒 Disable Capture button
-  captureBtn.disabled = true;
+  updateUIState(UI_STATE.COMPLETED);
+
+  speak("Case saved");
 
   if (session.type === "single") {
     const record = {
@@ -390,6 +422,7 @@ function finalizeSession() {
 
   exportZipSession(timestamp);
 }
+
 
 
 function exportZipSession(timestamp) {
@@ -414,6 +447,9 @@ function exportZipSession(timestamp) {
     }, null, 2)
   );
 
+  // 🔒 Disable Capture immediately
+  captureBtn.disabled = true;
+
   zip.generateAsync({ type: "blob" }).then(blob => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -423,6 +459,7 @@ function exportZipSession(timestamp) {
 
   resetSession();
 }
+
 
 function resetSession() {
   session = {
