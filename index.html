@@ -66,6 +66,8 @@ if (!snapshotCanvas) {
   throw new Error("Snapshot canvas missing in DOM");
 }
 
+let sessionCompleted = false;
+
 
     const cameraSelect = document.getElementById("cameraSelect");
 let currentStream = null;
@@ -150,14 +152,21 @@ let session = {
   captures: []
 };
 document.getElementById("captureBtn").onclick = () => {
+
+  if (sessionCompleted) {
+    console.log("[Session] Previous session completed. Waiting for user.");
+    return;
+  }
+
   if (!session.steps.length) {
     const captureType = document.getElementById("captureType").value;
     const patientName = document.getElementById("patient").value;
-    console.log("🟢 Auto-starting session", captureType, patientName);
     startSession(captureType, patientName);
   }
+
   handleCapture();
 };
+
 
 
 function initCaptureWorkflow() {
@@ -180,16 +189,7 @@ function initCaptureWorkflow() {
 }
 
 function startSession(captureType, patientName) {
-  if (!patientName || patientName.trim().length < 2) {
-    speak("Please enter patient name before starting");
-    alert("Please enter patient name");
-    return;
-  }
-
-  if (!captureType) {
-    console.warn("[Session] captureType missing");
-    return;
-  }
+  sessionCompleted = false;
 
   session.patient = patientName.trim();
   session.type = captureType;
@@ -197,9 +197,10 @@ function startSession(captureType, patientName) {
   session.currentIndex = 0;
   session.captures = [];
 
-  speakInstruction();
   updateInstruction();
+  speakInstruction();
 }
+
 
 function updateInstruction() {
   const step = session.steps[session.currentIndex];
@@ -311,17 +312,9 @@ function downloadJSON(filename, data) {
 
 
 function finalizeSession() {
-  console.log("🔥 finalizeSession CALLED", JSON.stringify(session));
-
   const timestamp = new Date().toISOString().replace(/[:]/g, "-");
 
-  console.log("[Finalize] Session type:", session.type);
-  console.log("[Finalize] Captures:", session.captures);
-
-  if (!session.captures.length) {
-    console.error("[Finalize] No captures, aborting");
-    return;
-  }
+  sessionCompleted = true;
 
   if (session.type === "single") {
     const record = {
@@ -332,19 +325,14 @@ function finalizeSession() {
       delta: session.captures[0].delta
     };
 
-    console.log("[Finalize] Creating JSON:", record);
-
-    downloadJSON(
-      `${session.patient}_${timestamp}.json`,
-      record
-    );
-
+    downloadJSON(`${session.patient}_${timestamp}.json`, record);
     resetSession();
     return;
   }
 
   exportZipSession(timestamp);
 }
+
 
 function exportZipSession(timestamp) {
   const zip = new JSZip();
@@ -383,8 +371,13 @@ function resetSession() {
     currentIndex: 0,
     captures: []
   };
-  document.getElementById("instruction").innerText = "Session complete";
+
+  document.getElementById("instruction").innerText =
+    "Session complete. Select capture type to start again.";
+
+  console.log("[Session] Reset complete");
 }
+
 
 
 let speechUnlocked = false;
