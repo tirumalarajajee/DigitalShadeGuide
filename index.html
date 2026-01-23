@@ -60,6 +60,11 @@ document.addEventListener("DOMContentLoaded", () => {
   initCameraSystem();
   initCaptureWorkflow();
 });
+if (!document.getElementById("patient").value.trim()) {
+  speakInstructionText("Please enter patient name");
+  return;
+}
+
 const snapshotCanvas = document.getElementById("snapshot");
 const snapshotCtx = snapshotCanvas.getContext("2d");
 if (!snapshotCanvas) {
@@ -167,6 +172,11 @@ document.getElementById("captureBtn").onclick = () => {
   handleCapture();
 };
 
+function safeName(str) {
+  return (str || "UnknownPatient")
+    .replace(/[^a-z0-9]/gi, "_")
+    .toLowerCase();
+}
 
 
 function initCaptureWorkflow() {
@@ -189,6 +199,12 @@ function initCaptureWorkflow() {
 }
 
 function startSession(captureType, patientName) {
+  if (!patientName || patientName.trim().length === 0) {
+    speakInstructionText("Please enter patient name before capturing");
+    alert("Please enter patient name");
+    return;
+  }
+
   sessionCompleted = false;
 
   session.patient = patientName.trim();
@@ -197,9 +213,12 @@ function startSession(captureType, patientName) {
   session.currentIndex = 0;
   session.captures = [];
 
+  console.log("[Session] Started for patient:", session.patient);
+
   updateInstruction();
   speakInstruction();
 }
+
 
 
 function updateInstruction() {
@@ -271,7 +290,10 @@ async function captureFrameAndAnalyze(region) {
 
   const [shade, delta] = findClosestShade([r,g,b]);
 
-  const imageBlob = await new Promise(res => canvas.toBlob(res, "image/jpeg"));
+  const imageBlob = await new Promise(res =>
+  snapshotCanvas.toBlob(res, "image/jpeg")
+);
+
   const base64 = await blobToBase64(imageBlob);
 
   return {
@@ -336,8 +358,10 @@ function finalizeSession() {
 
 function exportZipSession(timestamp) {
   const zip = new JSZip();
+
+  const patientSafe = safeName(session.patient);
   const root = zip.folder(
-    `${session.patient}_${session.type}_${timestamp}`
+    `${patientSafe}_${session.type}_${timestamp}`
   );
 
   session.captures.forEach(c => {
@@ -357,12 +381,13 @@ function exportZipSession(timestamp) {
   zip.generateAsync({ type: "blob" }).then(blob => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${session.patient}_${timestamp}.zip`;
+    a.download = `${patientSafe}_${timestamp}.zip`;
     a.click();
   });
 
   resetSession();
 }
+
 function resetSession() {
   session = {
     patient: null,
