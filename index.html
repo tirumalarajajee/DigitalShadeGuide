@@ -103,6 +103,7 @@ let sessionCompleted = false;
 
 
     const cameraSelect = document.getElementById("cameraSelect");
+const video = document.getElementById("camera");
 let currentStream = null;
 
 async function populateCameraSelector() {
@@ -148,16 +149,54 @@ cameraSelect.onchange = async () => {
   await startCameraById(id);
 };
 async function initCameraSystem() {
-  await populateCameraSelector();
 
-  const savedCameraId = localStorage.getItem("preferredCameraId");
-  if (savedCameraId) {
-    console.log("[Camera] Restoring saved camera");
-    await startCameraById(savedCameraId);
-  } else {
-    console.log("[Camera] No saved camera, using default");
-    await startCameraById(null);
-  }
+    console.log("[Camera] Initializing");
+
+    try {
+
+        // First try the default camera
+        // This guarantees permission and a valid stream.
+
+        await startCameraById(null);
+
+        // Now enumerate cameras
+        await populateCameraSelector();
+
+        // Restore saved camera if available
+        const savedCameraId =
+            localStorage.getItem("preferredCameraId");
+
+        if (savedCameraId) {
+
+            console.log(
+                "[Camera] Restoring saved camera:",
+                savedCameraId
+            );
+
+            try {
+
+                await startCameraById(savedCameraId);
+
+            } catch (err) {
+
+                console.warn(
+                    "[Camera] Saved camera failed:",
+                    err
+                );
+
+                localStorage.removeItem(
+                    "preferredCameraId"
+                );
+            }
+        }
+
+    } catch (err) {
+
+        console.error(
+            "[Camera] Initialization failed:",
+            err
+        );
+    }
 }
 
 function speak(text) {
@@ -640,7 +679,7 @@ async function loadShadesFromDB(db) {
     };
 
     let regionIndex = 0;
-    const video = document.getElementById("camera");
+    
     const canvas = document.getElementById("snapshot");
     const ctx = canvas.getContext("2d");
     const modeSelector = document.getElementById("modeSelector");
@@ -728,7 +767,7 @@ async function loadShadesFromDB(db) {
     document.getElementById("saveRegion").onclick = () => saveModeSnapshot("region");
     document.getElementById("saveMerge").onclick = () => saveModeSnapshot("merge");
 
-    initCameraSystem();
+    
 
 
 
