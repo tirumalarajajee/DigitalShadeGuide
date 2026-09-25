@@ -126,28 +126,155 @@ async function populateCameraSelector() {
   }
 }
 
-async function startCameraById(deviceId) {
-  if (currentStream) {
-    currentStream.getTracks().forEach(t => t.stop());
-  }
+async function startCameraById(deviceId = null) {
 
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      deviceId: deviceId ? { exact: deviceId } : undefined,
-      width: { ideal: 640 },
-      height: { ideal: 480 }
+    console.log(
+        "[Camera] startCameraById() called:",
+        deviceId
+    );
+
+    if (!navigator.mediaDevices) {
+        console.error("[Camera] navigator.mediaDevices missing");
+        return;
     }
-  });
 
-  currentStream = stream;
-  video.srcObject = stream;
+    if (!navigator.mediaDevices.getUserMedia) {
+        console.error("[Camera] getUserMedia missing");
+        return;
+    }
+
+    if (!video) {
+        console.error(
+            "[Camera] VIDEO ELEMENT NOT FOUND"
+        );
+        return;
+    }
+
+    console.log(
+        "[Camera] Video element found:",
+        video
+    );
+
+
+    // Stop old stream
+    if (currentStream) {
+
+        console.log(
+            "[Camera] Stopping old stream"
+        );
+
+        currentStream
+            .getTracks()
+            .forEach(track => track.stop());
+
+        currentStream = null;
+    }
+
+
+    const constraints = {
+        video: deviceId
+            ? {
+                deviceId: {
+                    exact: deviceId
+                }
+            }
+            : true,
+
+        audio: false
+    };
+
+
+    console.log(
+        "[Camera] Requesting:",
+        constraints
+    );
+
+
+    try {
+
+        const stream =
+            await navigator.mediaDevices.getUserMedia(
+                constraints
+            );
+
+
+        console.log(
+            "[Camera] getUserMedia SUCCESS"
+        );
+
+
+        currentStream = stream;
+
+
+        video.srcObject = stream;
+
+
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = true;
+
+
+        console.log(
+            "[Camera] srcObject assigned"
+        );
+
+
+        const tracks =
+            stream.getVideoTracks();
+
+        console.log(
+            "[Camera] Video tracks:",
+            tracks
+        );
+
+
+        if (tracks.length > 0) {
+
+            console.log(
+                "[Camera] Track settings:",
+                tracks[0].getSettings()
+            );
+        }
+
+
+        await video.play();
+
+
+        console.log(
+            "[Camera] video.play() SUCCESS"
+        );
+
+
+        console.log(
+            "[Camera] Video dimensions:",
+            video.videoWidth,
+            "x",
+            video.videoHeight
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "[Camera] getUserMedia FAILED"
+        );
+
+        console.error(
+            "[Camera] Error name:",
+            error.name
+        );
+
+        console.error(
+            "[Camera] Error message:",
+            error.message
+        );
+
+        console.error(
+            "[Camera] Full error:",
+            error
+        );
+    }
 }
-cameraSelect.onchange = async () => {
-  const id = cameraSelect.value;
-  localStorage.setItem("preferredCameraId", id);
-  console.log("[Camera] User selected:", id);
-  await startCameraById(id);
-};
 async function initCameraSystem() {
 
     console.log("[Camera] Initializing");
