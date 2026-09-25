@@ -653,43 +653,148 @@ async function getStoredVersion(db) {
 }
 
 async function syncShades() {
-  console.log("[ShadeDB] Sync started");
+    console.log("[ShadeDB] Sync started");
 
-  const db = await openDB();
-  const json = await fetch("shades.json").then(r => r.json());
+    try {
+        const db = await openDB();
 
-  console.log("[ShadeDB] JSON version:", json.version);
+        const response = await fetch("shades.json");
 
-  const storedVersion = await getStoredVersion(db);
-  console.log("[ShadeDB] Cached version:", storedVersion);
+        if (!response.ok) {
+            throw new Error(
+                `Failed to load shades.json: ${response.status}`
+            );
+        }
 
-  if (storedVersion === json.version) {
-    console.log("[ShadeDB] Using cached shades (IndexedDB)");
-    await loadShadesFromDB(db);
-    return;
-  }
+        const json = await response.json();
 
-  console.log(`[ShadeDB] Updating cache: ${storedVersion} → ${json.version}`);
+        console.log("[ShadeDB] JSON version:", json.version);
 
-  const tx = db.transaction([SHADE_STORE, META_STORE], "readwrite");
-  const shadeStore = tx.objectStore(SHADE_STORE);
+        // ----------------------------------------------------
+        // IMPORTANT:
+        // Populate the live in-memory shade map immediately.
+        // The analysis engine uses webShades.
+        // ----------------------------------------------------
 
-  shadeStore.clear();
-  console.log("[ShadeDB] Cleared old shade records");
+        webShades = { ...json.shades };
 
-  for (const [shadeCode, rgb] of Object.entries(json.shades)) {
-    shadeStore.put({ shadeCode, rgb });
-  }
+        console.log(
+            "[ShadeDB] Live shade map loaded:",
+            Object.keys(webShades)
+        );
 
-  tx.objectStore(META_STORE).put({
-    key: "version",
-    value: json.version
-  });
+        console.log(
+            "[ShadeDB] Live shade count:",
+            Object.keys(webShades).length
+        );
 
-  await tx.complete;
+        const storedVersion = await getStoredVersion(db);
 
-  console.log("[ShadeDB] Cache update complete");
-  await loadShadesFromDB(db);
+        console.log(
+            "[ShadeDB] Cached version:",
+            storedVersion
+        );
+
+        // ----------------------------------------------------
+        // Cache is already current
+        // ----------------------------------------------------
+
+        if (storedVersion === json.version) {
+
+            console.log(
+                "[ShadeDB] Using cached shades (IndexedDB)"
+            );
+
+            // Optional verification of IndexedDB cache
+            await loadShadesFromDB(db);
+
+            // If IndexedDB somehow returned nothing,
+            // restore from JSON.
+            if (Object.keys(webShades).length === 0) {
+
+                console.warn(
+                    "[ShadeDB] IndexedDB returned empty map."
+                );
+
+                webShades = { ...json.shades };
+            }
+
+            console.log(
+                "[ShadeDB] Final live shade count:",
+                Object.keys(webShades).length
+            );
+
+            return;
+        }
+
+        // ----------------------------------------------------
+        // Update IndexedDB cache
+        // ----------------------------------------------------
+
+        console.log(
+            `[ShadeDB] Updating cache: ${storedVersion} → ${json.version}`
+        );
+
+        await new Promise((resolve, reject) => {
+
+            const tx = db.transaction(
+                [SHADE_STORE, META_STORE],
+                "readwrite"
+            );
+
+            const shadeStore =
+                tx.objectStore(SHADE_STORE);
+
+            shadeStore.clear();
+
+            for (const [shadeCode, rgb]
+                 of Object.entries(json.shades)) {
+
+                shadeStore.put({
+                    shadeCode,
+                    rgb
+                });
+            }
+
+            tx.objectStore(META_STORE).put({
+                key: "version",
+                value: json.version
+            });
+
+            tx.oncomplete = () => {
+                console.log(
+                    "[ShadeDB] Cache update complete"
+                );
+                resolve();
+            };
+
+            tx.onerror = () => {
+                reject(tx.error);
+            };
+
+            tx.onabort = () => {
+                reject(
+                    tx.error ||
+                    new Error("IndexedDB transaction aborted")
+                );
+            };
+        });
+
+        // JSON remains the authoritative in-memory map
+        webShades = { ...json.shades };
+
+        console.log(
+            "[ShadeDB] Final live shade count:",
+            Object.keys(webShades).length
+        );
+
+    } catch (error) {
+
+        console.error(
+            "[ShadeDB] Sync failed:",
+            error
+        );
+    }
 }
 
 
@@ -816,7 +921,12 @@ console.log("[ShadeTest] RGB:", avg);
 
 
 
-    syncShades();
+    syncShades().then(() => {
+    console.log(
+        "[ShadeDB] READY:",
+        Object.keys(webShades)
+    );
+});
     setTimeout(() => {
     console.log(
         "[ShadeDB TEST] webShades =",
