@@ -913,10 +913,21 @@ console.log("[ShadeTest] RGB:", avg);
       a.click();
     }
 
-    document.getElementById("saveSingle").onclick = () => saveModeSnapshot("single");
-    document.getElementById("saveRegion").onclick = () => saveModeSnapshot("region");
-    document.getElementById("saveMerge").onclick = () => saveModeSnapshot("merge");
+    const saveSingle = document.getElementById("saveSingle");
+const saveRegion = document.getElementById("saveRegion");
+const saveMerge = document.getElementById("saveMerge");
 
+if (saveSingle) {
+    saveSingle.onclick = () => saveModeSnapshot("single");
+}
+
+if (saveRegion) {
+    saveRegion.onclick = () => saveModeSnapshot("region");
+}
+
+if (saveMerge) {
+    saveMerge.onclick = () => saveModeSnapshot("merge");
+}
     
 
 
