@@ -817,6 +817,17 @@ console.log("[ShadeTest] RGB:", avg);
 
 
     syncShades();
+    setTimeout(() => {
+    console.log(
+        "[ShadeDB TEST] webShades =",
+        webShades
+    );
+
+    console.log(
+        "[ShadeDB TEST] count =",
+        Object.keys(webShades).length
+    );
+}, 2000);
 
   </script>
 </body>
