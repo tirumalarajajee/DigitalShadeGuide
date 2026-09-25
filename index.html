@@ -141,45 +141,54 @@ async function populateCameraSelector() {
 
 async function startCameraById(deviceId = null) {
 
-    console.log("[Camera] startCameraById ENTERED", deviceId);
-    console.log("[Camera] video element =", video);
-    console.log("[Camera] mediaDevices =", navigator.mediaDevices);
+    console.log("[Camera] startCameraById ENTERED:", deviceId);
 
-    if (currentStream) {
-        currentStream.getTracks().forEach(t => t.stop());
-    }
+    try {
 
-    console.log("[Camera] ABOUT TO CALL getUserMedia");
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+        }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-    });
+        console.log("[Camera] Requesting default camera");
 
-    console.log("[Camera] getUserMedia RETURNED");
-
-    currentStream = stream;
-
-    video.srcObject = stream;
-
-    console.log("[Camera] srcObject assigned");
-
-    video.onloadedmetadata = () => {
+        const stream =
+            await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false
+            });
 
         console.log(
-            "[Camera] metadata loaded:",
+            "[Camera] getUserMedia SUCCESS",
+            stream
+        );
+
+        currentStream = stream;
+
+        video.srcObject = stream;
+
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = true;
+
+        console.log("[Camera] srcObject assigned");
+
+        await video.play();
+
+        console.log(
+            "[Camera] VIDEO PLAYING",
             video.videoWidth,
             video.videoHeight
         );
 
-        video.play()
-            .then(() => {
-                console.log("[Camera] VIDEO PLAYING");
-            })
-            .catch(err => {
-                console.error("[Camera] PLAY ERROR:", err);
-            });
-    };
+    } catch (error) {
+
+        console.error(
+            "[Camera] FAILED:",
+            error.name,
+            error.message
+        );
+    }
 }
 async function initCameraSystem() {
 
