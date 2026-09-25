@@ -141,152 +141,45 @@ async function populateCameraSelector() {
 
 async function startCameraById(deviceId = null) {
 
-    console.log(
-        "[Camera] startCameraById() called:",
-        deviceId
-    );
+    console.log("[Camera] startCameraById ENTERED", deviceId);
+    console.log("[Camera] video element =", video);
+    console.log("[Camera] mediaDevices =", navigator.mediaDevices);
 
-    if (!navigator.mediaDevices) {
-        console.error("[Camera] navigator.mediaDevices missing");
-        return;
-    }
-
-    if (!navigator.mediaDevices.getUserMedia) {
-        console.error("[Camera] getUserMedia missing");
-        return;
-    }
-
-    if (!video) {
-        console.error(
-            "[Camera] VIDEO ELEMENT NOT FOUND"
-        );
-        return;
-    }
-
-    console.log(
-        "[Camera] Video element found:",
-        video
-    );
-
-
-    // Stop old stream
     if (currentStream) {
-
-        console.log(
-            "[Camera] Stopping old stream"
-        );
-
-        currentStream
-            .getTracks()
-            .forEach(track => track.stop());
-
-        currentStream = null;
+        currentStream.getTracks().forEach(t => t.stop());
     }
 
+    console.log("[Camera] ABOUT TO CALL getUserMedia");
 
-    const constraints = {
-        video: deviceId
-            ? {
-                deviceId: {
-                    exact: deviceId
-                }
-            }
-            : true,
-
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
         audio: false
-    };
+    });
 
+    console.log("[Camera] getUserMedia RETURNED");
 
-    console.log(
-        "[Camera] Requesting:",
-        constraints
-    );
+    currentStream = stream;
 
+    video.srcObject = stream;
 
-    try {
+    console.log("[Camera] srcObject assigned");
 
-        const stream =
-            await navigator.mediaDevices.getUserMedia(
-                constraints
-            );
-
+    video.onloadedmetadata = () => {
 
         console.log(
-            "[Camera] getUserMedia SUCCESS"
-        );
-
-
-        currentStream = stream;
-
-
-        video.srcObject = stream;
-
-
-        video.autoplay = true;
-        video.playsInline = true;
-        video.muted = true;
-
-
-        console.log(
-            "[Camera] srcObject assigned"
-        );
-
-
-        const tracks =
-            stream.getVideoTracks();
-
-        console.log(
-            "[Camera] Video tracks:",
-            tracks
-        );
-
-
-        if (tracks.length > 0) {
-
-            console.log(
-                "[Camera] Track settings:",
-                tracks[0].getSettings()
-            );
-        }
-
-
-        await video.play();
-
-
-        console.log(
-            "[Camera] video.play() SUCCESS"
-        );
-
-
-        console.log(
-            "[Camera] Video dimensions:",
+            "[Camera] metadata loaded:",
             video.videoWidth,
-            "x",
             video.videoHeight
         );
 
-
-    } catch (error) {
-
-        console.error(
-            "[Camera] getUserMedia FAILED"
-        );
-
-        console.error(
-            "[Camera] Error name:",
-            error.name
-        );
-
-        console.error(
-            "[Camera] Error message:",
-            error.message
-        );
-
-        console.error(
-            "[Camera] Full error:",
-            error
-        );
-    }
+        video.play()
+            .then(() => {
+                console.log("[Camera] VIDEO PLAYING");
+            })
+            .catch(err => {
+                console.error("[Camera] PLAY ERROR:", err);
+            });
+    };
 }
 async function initCameraSystem() {
 
