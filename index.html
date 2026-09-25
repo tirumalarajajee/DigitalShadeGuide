@@ -788,6 +788,9 @@ async function loadShadesFromDB(db) {
   ).data;
 
   const avg = getAverageRGB(data);
+      console.log("[ShadeTest] webShades:", webShades);
+console.log("[ShadeTest] count:", Object.keys(webShades).length);
+console.log("[ShadeTest] RGB:", avg);
   const [shade, delta] = findClosestShade(avg);
   const region = session.steps[session.currentIndex] || "---";
 
