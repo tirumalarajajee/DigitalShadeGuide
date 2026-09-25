@@ -5,7 +5,15 @@
   <title>Tooth Shade Detection</title>
   <style>
    body { font-family: sans-serif; text-align: center; background: #f0f0f0; }
-#camera { display: none; }
+#camera {
+    display: block;
+    width: 640px;
+    height: 480px;
+    margin: 10px auto;
+    border: 1px solid #000;
+    background: #000;
+    object-fit: contain;
+}
 #snapshot { display: block; margin: 10px auto; border: 1px solid #000; }
 
     #confidenceFill {
@@ -24,7 +32,12 @@
 
   <h2>🦷 Detection Mode</h2>
   <video id="camera" autoplay playsinline width="640" height="480"></video>
-  <canvas id="snapshot" width="640" height="480" style="border:1px solid #000;"></canvas>
+  <canvas
+    id="snapshot"
+    width="640"
+    height="480"
+    style="display:none;">
+</canvas>
 
   <br />
 
